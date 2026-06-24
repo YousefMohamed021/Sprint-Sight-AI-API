@@ -1,8 +1,3 @@
-"""
-Pydantic schemas — defines what the API accepts and returns.
-All field names map directly to the features used during training.
-"""
-
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -143,6 +138,7 @@ class SprintInput(BaseModel):
     )
 
     class Config:
+        extra = "ignore"
         json_schema_extra = {
             "example": {
                 "plan_duration_hours": 336.0,

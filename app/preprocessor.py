@@ -1,9 +1,3 @@
-"""
-Text preprocessor — must match EXACTLY what was done in the embedding notebook
-(Cell 3 of sprint2vec_embedding.ipynb). Any difference here will cause
-the embeddings to be out-of-distribution from what the model was trained on.
-"""
-
 import re
 import textstat
 
@@ -56,6 +50,7 @@ def preprocess_sprint_text(text: str) -> str:
     text = re.sub(r" +", " ", text).strip()
 
     return text if text else "[EMPTY]"
+
 def calculate_fog_index(text: str) -> float: 
     if not isinstance(text, str) or text.strip() == "":
         return 0.0

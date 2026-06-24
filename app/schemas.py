@@ -6,16 +6,6 @@ All field names map directly to the features used during training.
 from pydantic import BaseModel, Field
 from enum import Enum
 
-
-# ── Enums for categorical fields ───────────────────────────────────────────────
-
-class DevPreferredType(str, Enum):
-    bug        = "Bug"
-    na         = "Na"
-    subtask    = "Sub-task"
-    suggestion = "Suggestion"
-
-
 # ── Request schema ─────────────────────────────────────────────────────────────
 
 class SprintInput(BaseModel):
@@ -43,11 +33,6 @@ class SprintInput(BaseModel):
         default=5.0, ge=0,
         description="Total number of components assigned across all issues in the sprint",
         example=18.0
-    )
-    fog_index: float = Field(
-        default=10.0, ge=0,
-        description="Average Gunning Fog readability index of issue descriptions (higher = harder to read)",
-        example=12.3
     )
     no_comments: float = Field(
         default=10.0, ge=0,
@@ -145,11 +130,10 @@ class SprintInput(BaseModel):
         description="Average developer activeness score (number of issues involved in past 3 months)",
         example=15.0
     )
-    dev_preferred_type: DevPreferredType = Field(
-        default=DevPreferredType.bug,
-        description="The issue type developers in this sprint most commonly work on",
-        example="Bug"
-    )
+    dev_prefer_bug_count: int = Field(default=0, ge=0, description="Number of developers whose preferred issue type is Bug")
+    dev_prefer_na_count: int = Field(default=0, ge=0, description="Number of developers with no preferred issue type (Na)")
+    dev_prefer_subtask_count: int = Field(default=0, ge=0, description="Number of developers whose preferred issue type is Sub-task")
+    dev_prefer_suggestion_count: int = Field(default=0, ge=0, description="Number of developers whose preferred issue type is Suggestion")
 
     # ── Text feature ───────────────────────────────────────────────────────────
     sprint_text: str = Field(
@@ -165,7 +149,6 @@ class SprintInput(BaseModel):
                 "no_issues": 12,
                 "no_team_members": 5,
                 "no_components": 18.0,
-                "fog_index": 12.3,
                 "no_comments": 36.0,
                 "no_description_changes": 4.0,
                 "no_priority_changes": 2.0,
@@ -184,7 +167,10 @@ class SprintInput(BaseModel):
                 "priority_trivial_count": 0,
                 "no_distinct_actions": 45.0,
                 "developer_activeness": 15.0,
-                "dev_preferred_type": "Bug",
+                "dev_prefer_bug_count": 3,
+                "dev_prefer_na_count": 1,
+                "dev_prefer_subtask_count": 1,
+                "dev_prefer_suggestion_count": 0,
                 "sprint_text": "Fix login timeout bug affecting mobile users. Improve dashboard load performance. Add export to CSV feature for reports."
             }
         }

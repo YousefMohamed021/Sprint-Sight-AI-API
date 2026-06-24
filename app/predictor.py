@@ -6,25 +6,25 @@ import torch
 from pathlib import Path
 from transformers import AutoTokenizer, AutoModel
 
-from app.preprocessor import preprocess_sprint_text
+from app.preprocessor import preprocess_sprint_text , calculate_fog_index
 from app.schemas import SprintInput, PredictionResponse
 
 
-# ── Paths — adjust if your artefacts folder is elsewhere ──────────────────────
+# ── Paths
 BASE_DIR      = Path(__file__).resolve().parent.parent   # project root
-ARTEFACTS_DIR = BASE_DIR / "artefacts"
+MODELS_DIR = BASE_DIR / "models"
 
-SCALER_PATH   = ARTEFACTS_DIR / "scaler.pkl"
-PROD_MODEL    = ARTEFACTS_DIR / "model_productivity.pkl"
-QUAL_MODEL    = ARTEFACTS_DIR / "model_quality.pkl"
-FEAT_COLS     = ARTEFACTS_DIR / "feature_cols.pkl"
+SCALER_PATH   = MODELS_DIR / "scaler.pkl"
+PROD_MODEL    = MODELS_DIR / "model_productivity.pkl"
+QUAL_MODEL    = MODELS_DIR / "model_quality.pkl"
+FEAT_COLS     = MODELS_DIR / "feature_cols.pkl"
 
-# HuggingFace model ID — matches what the embedding notebook used
+# HuggingFace model ID 
 EMBEDDING_MODEL_ID = "jeniya/BERTOverflow"
 MAX_TOKENS         = 512
 
 
-# ── Column name constants — must match training dataset exactly ────────────────
+# ── Column name constants
 # Sprint-level
 COL_PLAN_DURATION = "s_plan_duration"
 COL_NO_ISSUE      = "s_no_issue"
@@ -38,21 +38,12 @@ COL_NO_CHANGE_DESC     = "i_no_change_description"
 COL_NO_CHANGE_PRIORITY = "i_no_change_priority"
 COL_NO_CHANGE_FIX      = "i_no_change_fix"
 
-# Developer one-hot
-DEV_TYPE_COLS = {
-    "Bug":       "d_most_prefer_type_Bug",
-    "Na":        "d_most_prefer_type_Na",
-    "Sub-task":  "d_most_prefer_type_Sub-task",
-    "Suggestion":"d_most_prefer_type_Suggestion",
-}
-
 # Developer numeric
 COL_NO_DISTINCT_ACTION  = "d_no_distinct_action"
 COL_DEVELOPER_ACTIVENESS = "d_developer_activeness"
 
 # Embedding prefix
 EMB_PREFIX = "bof_emb"
-
 
 class Predictor:
     """Loads all artefacts at init and exposes a single .predict() method."""
@@ -66,7 +57,7 @@ class Predictor:
             if not path.exists():
                 raise FileNotFoundError(
                     f"Artefact not found: {path}\n"
-                    f"Make sure all .pkl files are in: {ARTEFACTS_DIR}"
+                    f"Make sure all .pkl files are in: {MODELS_DIR}"
                 )
 
         # ── Load sklearn artefacts ─────────────────────────────────────────────
@@ -99,7 +90,7 @@ class Predictor:
     def is_ready(self) -> bool:
         return self._ready
 
-    # ── Step 2: Generate BERTOverflow embedding ───────────────────────────────
+    # ── Step 2: Generate BERTOverflow embeddings
     def _embed(self, text: str) -> np.ndarray:
         """
         Tokenise cleaned text and return mean-pooled last hidden state.
@@ -144,7 +135,7 @@ class Predictor:
 
         # ── Issue features ─────────────────────────────────────────────────────
         row[COL_NO_COMPONENT]       = sprint.no_components
-        row[COL_FOG_INDEX]          = sprint.fog_index
+        row[COL_FOG_INDEX]          = calculate_fog_index(sprint.sprint_text)
         row[COL_NO_COMMENTS]        = sprint.no_comments
         row[COL_NO_CHANGE_DESC]     = sprint.no_description_changes
         row[COL_NO_CHANGE_PRIORITY] = sprint.no_priority_changes
@@ -166,13 +157,15 @@ class Predictor:
         row["i_priority_Minor"]    = sprint.priority_minor_count
         row["i_priority_Trivial"]  = sprint.priority_trivial_count
 
-        # ── Developer features ─────────────────────────────────────────────────
+# ── Developer features ─────────────────────────────────────────────────
         row[COL_NO_DISTINCT_ACTION]   = sprint.no_distinct_actions
         row[COL_DEVELOPER_ACTIVENESS] = sprint.developer_activeness
 
-        # Dev preferred type one-hot
-        for dev_type, col_name in DEV_TYPE_COLS.items():
-            row[col_name] = 1.0 if sprint.dev_preferred_type.value == dev_type else 0.0
+        # ── Map Developer Preference Counts ──
+        row["d_most_prefer_type_Bug"]        = sprint.dev_prefer_bug_count
+        row["d_most_prefer_type_Na"]         = sprint.dev_prefer_na_count
+        row["d_most_prefer_type_Sub-task"]   = sprint.dev_prefer_subtask_count
+        row["d_most_prefer_type_Suggestion"] = sprint.dev_prefer_suggestion_count
 
         # ── Embedding dimensions (768 values) ──────────────────────────────────
         for i, val in enumerate(embedding):

@@ -5,7 +5,7 @@ the embeddings to be out-of-distribution from what the model was trained on.
 """
 
 import re
-
+import textstat
 
 def preprocess_sprint_text(text: str) -> str:
     """
@@ -56,3 +56,9 @@ def preprocess_sprint_text(text: str) -> str:
     text = re.sub(r" +", " ", text).strip()
 
     return text if text else "[EMPTY]"
+def calculate_fog_index(text: str) -> float: 
+    if not isinstance(text, str) or text.strip() == "":
+        return 0.0
+    
+    fog_index = textstat.gunning_fog(text)
+    return round(fog_index, 4)

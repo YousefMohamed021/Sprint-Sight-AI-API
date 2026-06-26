@@ -6,7 +6,8 @@ RUN apt-get update \
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    HF_HOME=/opt/hf-cache
+    HF_HOME=/opt/hf-cache \
+    NLTK_DATA=/opt/nltk_data
 
 WORKDIR /app
 
@@ -17,6 +18,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 ARG MODEL_ID=jeniya/BERTOverflow
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='${MODEL_ID}')"
+RUN python -c "import nltk; nltk.download('cmudict', download_dir='/opt/nltk_data')"
 
 ENV HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1

@@ -225,8 +225,8 @@ class Predictor:
         quality      = float(np.clip(np.expm1(qual_raw), 0, None))
 
         return PredictionResponse(
-            productivity=round(productivity, 4),
-            quality=round(quality, 4),
+            productivity=round(productivity, 4)*100,
+            quality=round(quality, 4)*100,
             productivity_label=self._productivity_label(productivity),
             quality_label=self._quality_label(quality),
         )

@@ -122,8 +122,6 @@ curl -X POST http://localhost:8000/predict \
 {
   "productivity": 0.9077,
   "quality": 0.9069,
-  "productivity_label": "Excellent — team is on track to complete nearly all committed work",
-  "quality_label": "Very high — majority of completed issues may need rework"
 }
 ```
 
@@ -135,7 +133,4 @@ curl -X POST http://localhost:8000/predict \
 2. Open `http://localhost:8000/docs` in your browser
 3. Click **POST /predict → Try it out**
 4. Fill in the form and click **Execute**
-
-No code needed — the Swagger UI is a full interactive client.
-
 ---

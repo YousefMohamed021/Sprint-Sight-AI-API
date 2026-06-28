@@ -10,8 +10,8 @@ from app.preprocessor import preprocess_sprint_text , calculate_fog_index
 from app.schemas import SprintInput, PredictionResponse
 
 
-# ── Paths
-BASE_DIR      = Path(__file__).resolve().parent.parent   # project root
+# Paths
+BASE_DIR      = Path(__file__).resolve().parent.parent
 MODELS_DIR = BASE_DIR / "models"
 
 SCALER_PATH   = MODELS_DIR / "scaler.pkl"
@@ -23,8 +23,6 @@ FEAT_COLS     = MODELS_DIR / "feature_cols.pkl"
 EMBEDDING_MODEL_ID = "jeniya/BERTOverflow"
 MAX_TOKENS         = 512
 
-
-# ── Column name constants
 # Sprint-level
 COL_PLAN_DURATION = "s_plan_duration"
 COL_NO_ISSUE      = "s_no_issue"
@@ -52,7 +50,6 @@ class Predictor:
         self._ready = False
         self.embedding_model_id = EMBEDDING_MODEL_ID
 
-        # ── Validate artefact files exist ──────────────────────────────────────
         for path in [SCALER_PATH, PROD_MODEL, QUAL_MODEL, FEAT_COLS]:
             if not path.exists():
                 raise FileNotFoundError(
@@ -60,7 +57,6 @@ class Predictor:
                     f"Make sure all .pkl files are in: {MODELS_DIR}"
                 )
 
-        # ── Load sklearn artefacts ─────────────────────────────────────────────
         print(f"  Loading scaler from {SCALER_PATH.name} ...")
         self.scaler = joblib.load(SCALER_PATH)
 
@@ -73,13 +69,13 @@ class Predictor:
         print(f"  Loading feature column list from {FEAT_COLS.name} ...")
         self.feature_cols: list = joblib.load(FEAT_COLS)
 
-        # ── Load BERTOverflow ──────────────────────────────────────────────────
+        # Load BERTOverflow
         print(f"  Loading tokenizer: {EMBEDDING_MODEL_ID} ...")
         self.tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_ID)
 
         print(f"  Loading BERT model: {EMBEDDING_MODEL_ID} ...")
         self.bert = AutoModel.from_pretrained(EMBEDDING_MODEL_ID)
-        self.bert.eval()    # disable dropout for deterministic inference
+        self.bert.eval()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.bert = self.bert.to(self.device)
@@ -90,7 +86,7 @@ class Predictor:
     def is_ready(self) -> bool:
         return self._ready
 
-    # ── Step 2: Generate BERTOverflow embeddings
+    # BERTOverflow embeddings
     def _embed(self, text: str) -> np.ndarray:
         """
         Tokenise cleaned text and return mean-pooled last hidden state.
@@ -108,14 +104,13 @@ class Predictor:
         with torch.no_grad():
             output = self.bert(**encoded)
 
-        # Mean-pool over non-padding tokens (attention_mask = 1 for real tokens)
-        last_hidden = output.last_hidden_state          # (1, seq_len, 768)
-        mask        = encoded["attention_mask"].unsqueeze(-1).float()  # (1, seq_len, 1)
-        embedding   = (last_hidden * mask).sum(dim=1) / mask.sum(dim=1)  # (1, 768)
+        last_hidden = output.last_hidden_state
+        mask        = encoded["attention_mask"].unsqueeze(-1).float()
+        embedding   = (last_hidden * mask).sum(dim=1) / mask.sum(dim=1) 
 
         return embedding.cpu().numpy().flatten()        # (768,)
 
-    # ── Step 3: Build feature row ─────────────────────────────────────────────
+    #  Step 3: Build feature row 
     def _build_feature_row(
         self,
         sprint: SprintInput,
@@ -128,12 +123,12 @@ class Predictor:
         """
         row = {}
 
-        # ── Sprint features ────────────────────────────────────────────────────
+        # Sprint features
         row[COL_PLAN_DURATION] = sprint.plan_duration_hours
         row[COL_NO_ISSUE]      = sprint.no_issues
         row[COL_NO_TEAM]       = sprint.no_team_members
 
-        # ── Issue features ─────────────────────────────────────────────────────
+        # Issue features
         row[COL_NO_COMPONENT]       = sprint.no_components
         row[COL_FOG_INDEX]          = calculate_fog_index(sprint.sprint_text)
         row[COL_NO_COMMENTS]        = sprint.no_comments
@@ -141,12 +136,12 @@ class Predictor:
         row[COL_NO_CHANGE_PRIORITY] = sprint.no_priority_changes
         row[COL_NO_CHANGE_FIX]      = sprint.no_fix_version_changes
 
-        # ── EXACT ISSUE TYPE COUNTS ──
+        # EXACT ISSUE TYPE COUNTS 
         row["i_type_Bug"]             = sprint.type_bug_count
         row["i_type_Suggestion"]      = sprint.type_suggestion_count
         row["i_type_Support Request"] = sprint.type_support_request_count
 
-        # ── EXACT ISSUE PRIORITY COUNTS ──
+        # EXACT ISSUE PRIORITY COUNTS 
         row["i_priority_Blocker"]  = sprint.priority_blocker_count
         row["i_priority_Critical"] = sprint.priority_critical_count
         row["i_priority_High"]     = sprint.priority_high_count
@@ -157,67 +152,41 @@ class Predictor:
         row["i_priority_Minor"]    = sprint.priority_minor_count
         row["i_priority_Trivial"]  = sprint.priority_trivial_count
 
-# ── Developer features ─────────────────────────────────────────────────
+#  Developer features
         row[COL_NO_DISTINCT_ACTION]   = sprint.no_distinct_actions
         row[COL_DEVELOPER_ACTIVENESS] = sprint.developer_activeness
 
-        # ── Map Developer Preference Counts ──
+        #  Map Developer Preference Counts 
         row["d_most_prefer_type_Bug"]        = sprint.dev_prefer_bug_count
         row["d_most_prefer_type_Na"]         = sprint.dev_prefer_na_count
         row["d_most_prefer_type_Sub-task"]   = sprint.dev_prefer_subtask_count
         row["d_most_prefer_type_Suggestion"] = sprint.dev_prefer_suggestion_count
 
-        # ── Embedding dimensions (768 values) ──────────────────────────────────
         for i, val in enumerate(embedding):
             row[f"{EMB_PREFIX}_{i}"] = float(val)
 
-        # Build DataFrame with correct column order from training
         df = pd.DataFrame([row])
 
-        # Add any missing columns as 0 (safety net)
         for col in self.feature_cols:
             if col not in df.columns:
                 df[col] = 0.0
 
-        # Enforce exact column order
         df = df[self.feature_cols]
 
         return df
 
-    # ── Human-readable labels ─────────────────────────────────────────────────
-    @staticmethod
-    def _productivity_label(score: float) -> str:
-        if score >= 0.90:  return "Excellent — team is on track to complete nearly all committed work"
-        if score >= 0.75:  return "Good — most committed issues are expected to be completed"
-        if score >= 0.50:  return "Moderate — roughly half the committed issues will be completed"
-        if score >= 0.25:  return "Low — significant underdelivery expected"
-        return                    "Very low — most committed issues are at risk of not being completed"
-
-    @staticmethod
-    def _quality_label(score: float) -> str:
-        if score <= 0.05:  return "Excellent — very few issues expected to be reopened"
-        if score <= 0.15:  return "Good — low reopen rate expected"
-        if score <= 0.30:  return "Moderate — some rework likely"
-        if score <= 0.50:  return "High — significant rework risk"
-        return                    "Very high — majority of completed issues may need rework"
-
-    # ── Main predict method ───────────────────────────────────────────────────
+    #  Main predict method
     def predict(self, sprint: SprintInput) -> PredictionResponse:
         """Full pipeline: SprintInput → PredictionResponse."""
 
-        # Step 1: Clean text (matches training preprocessing exactly)
         cleaned_text = preprocess_sprint_text(sprint.sprint_text)
 
-        # Step 2: Generate BERTOverflow embedding
-        embedding = self._embed(cleaned_text)                   # (768,)
+        embedding = self._embed(cleaned_text)
 
-        # Step 3: Assemble feature row in correct column order
-        X_df = self._build_feature_row(sprint, embedding)       # (1, 796)
+        X_df = self._build_feature_row(sprint, embedding)
 
-        # Step 4: Apply the same StandardScaler fitted during training
-        X_scaled = self.scaler.transform(X_df)                  # (1, 796)
+        X_scaled = self.scaler.transform(X_df)
 
-        # Step 5 & 6: Predict and inverse log1p transform
         prod_raw = self.model_prod.predict(X_scaled)[0]
         qual_raw = self.model_qual.predict(X_scaled)[0]
 
@@ -227,6 +196,4 @@ class Predictor:
         return PredictionResponse(
             productivity=round(productivity, 4)*100,
             quality=round(quality, 4)*100,
-            productivity_label=self._productivity_label(productivity),
-            quality_label=self._quality_label(quality),
         )

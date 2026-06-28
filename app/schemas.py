@@ -1,11 +1,10 @@
 from pydantic import BaseModel, Field
 
-# ── Request schema ─────────────────────────────────────────────────────────────
-
+#  Request schema
 class SprintInput(BaseModel):
     """All fields required to predict sprint productivity and quality."""
 
-    # ── Sprint-level features ──────────────────────────────────────────────────
+    #Sprint features
     plan_duration_hours: float = Field(
         ..., gt=0,
         description="Planned sprint duration in hours (e.g. 336 for 2 weeks)",
@@ -22,7 +21,7 @@ class SprintInput(BaseModel):
         example=5
     )
 
-    # ── Issue-level features (aggregated across all sprint issues) ─────────────
+    # Issue features
     no_components: float = Field(
         default=5.0, ge=0,
         description="Total number of components assigned across all issues in the sprint",
@@ -49,7 +48,6 @@ class SprintInput(BaseModel):
         example=1.0
     )
 
-    # ── Issue Type Counts ──
     type_bug_count: int = Field(
         default=0, ge=0, 
         description="Total number of Bug issues in the sprint",
@@ -66,7 +64,6 @@ class SprintInput(BaseModel):
         example=3
     )
 
-    # ── Issue Priority Counts ──
     priority_blocker_count: int = Field(
         default=0, ge=0, 
         description="Total number of Blocker priority issues",
@@ -113,7 +110,7 @@ class SprintInput(BaseModel):
         example=0
     )
 
-    # ── Developer-level features (aggregated across all sprint developers) ─────
+    #  Developer features 
     no_distinct_actions: float = Field(
         default=15.0, ge=0,
         description="Total number of distinct action types performed by developers before sprint start",
@@ -129,7 +126,6 @@ class SprintInput(BaseModel):
     dev_prefer_subtask_count: int = Field(default=0, ge=0, description="Number of developers whose preferred issue type is Sub-task")
     dev_prefer_suggestion_count: int = Field(default=0, ge=0, description="Number of developers whose preferred issue type is Suggestion")
 
-    # ── Text feature ───────────────────────────────────────────────────────────
     sprint_text: str = Field(
         ..., min_length=10,
         description="Combined text of all issue summaries and descriptions in this sprint",
@@ -171,7 +167,7 @@ class SprintInput(BaseModel):
         }
 
 
-# ── Response schemas ───────────────────────────────────────────────────────────
+#Response schemas 
 
 class PredictionResponse(BaseModel):
     """Prediction results returned by the /predict endpoint."""
@@ -183,12 +179,6 @@ class PredictionResponse(BaseModel):
     quality: float = Field(
         description="Predicted reopen ratio — fraction of completed issues expected to be reopened. "
                     "e.g. 0.12 means 12% of completed issues may require rework. Lower is better."
-    )
-    productivity_label: str = Field(
-        description="Human-readable interpretation of the productivity score"
-    )
-    quality_label: str = Field(
-        description="Human-readable interpretation of the quality score"
     )
 
 

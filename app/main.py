@@ -12,7 +12,6 @@ from app.schemas import SprintInput, PredictionResponse, HealthResponse
 from app.predictor import Predictor
 
 
-# ── Lifespan: load models ONCE at startup, reuse for every request ─────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀  Loading models and tokenizer...")
@@ -23,7 +22,6 @@ async def lifespan(app: FastAPI):
     print("👋  Shutting down")
 
 
-# ── App setup ──────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="SprintSight API",
     description=(
@@ -35,16 +33,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow requests from any frontend (React, Streamlit, etc.) on localhost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # tighten this in production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @app.get("/", tags=["Root"])
 def root():
@@ -63,7 +57,6 @@ def health():
         models_loaded=predictor.is_ready(),
         embedding_model=predictor.embedding_model_id,
     )
-
 
 @app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
 def predict(sprint: SprintInput):

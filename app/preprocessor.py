@@ -3,9 +3,6 @@ import textstat
 
 def preprocess_sprint_text(text: str) -> str:
     """
-    Clean sprint text following Sprint2Vec paper Section III-C1.
-
-    Steps (in order):
       1. Remove HTML tags
       2. Remove URLs
       3. Remove file references
